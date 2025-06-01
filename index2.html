@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fixed Challenge & Habit Tracker</title>
+  <style>
+    /* Reset and basic styles */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; color: #333; display: flex; justify-content: center; padding: 20px; }
+    h1, h2 { text-align: center; margin-bottom: 20px; color: #2c3e50; }
+    .container { background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 550px; width: 100%; padding: 25px; }
+    .hidden { display: none; }
+    input, textarea, button { width: 100%; padding: 12px; margin: 12px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    textarea { resize: vertical; }
+    button { background: #3498db; color: #fff; border: none; cursor: pointer; font-weight: 600; }
+    button:hover { background: #2980b9; }
+    /* Circular progress */
+    .circle-container { display: flex; justify-content: space-around; margin-bottom: 10px; }
+    .circle { position: relative; width: 110px; height: 110px; }
+    .circle svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+    .circle circle { fill: none; stroke-width: 10; }
+    .circle .bg { stroke: #ecf0f1; }
+    .circle .progress { stroke: #3498db; stroke-linecap: round; stroke-dasharray: 0 1000; transition: stroke-dashoffset 0.5s ease; }
+    .circle .label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.1rem; font-weight: 700; color: #2c3e50; }
+    /* Mode toggle under circles */
+    .mode-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
+    .mode { cursor: pointer; padding: 6px 12px; border-radius: 6px; font-weight: 600; color: #7f8c8d; }
+    .mode.active, .mode:hover { color: #3498db; }
+    /* Progress bar for challenge days */
+    .progress-bar-container { margin-bottom: 25px; }
+    .progress-label { text-align: center; margin-bottom: 8px; font-weight: 600; color: #2c3e50; }
+    .progress-bar { width: 100%; background: #ecf0f1; border-radius: 8px; overflow: hidden; height: 18px; }
+    .progress-bar-inner { height: 100%; width: 0; background: #2ecc71; transition: width 0.5s ease; }
+    /* Task list & Habit list */
+    ul { list-style: none; margin-top: 15px; padding: 0; }
+    li { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 8px 12px; border-radius: 6px; background: #fafafa; transition: background 0.3s; }
+    li:hover { background: #f0f3f5; }
+    li span { flex: 1; font-size: 1rem; color: #34495e; margin-right: 10px; }
+    input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
+    .habit-ticks { display: flex; align-items: center; }
+    .habit-ticks input[type="checkbox"] { margin: 0 4px; transform: scale(1.2); }
+    /* History tables */
+    .history-section { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 0.9rem; }
+    th { background: #f7f7f1; color: #2c3e50; }
+    .completed { background: #dff0d8; }
+    .missed { background: #f9d6d5; }
+    .history-label { font-weight: 600; margin-top: 15px; color: #2c3e50; }
+    /* Collapsible detail rows */
+    .detail-row td { background: #f9f9f9; padding: 8px 12px; }
+    .date-cell { cursor: pointer; display: flex; justify-content: center; align-items: center; }
+    .toggle-icon { font-size: 1rem; margin-left: 8px; }
+    /* Header nav */
+    .nav { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+    .nav button { width: auto; margin-left: 12px; padding: 6px 12px; font-size: 0.9rem; }
+    /* Responsive */
+    @media (max-width: 480px) {
+      .circle-container { flex-direction: column; align-items: center; }
+      .circle { margin-bottom: 20px; }
+      li { font-size: 0.95rem; padding: 6px 10px; }
+      .progress-bar-container { margin-bottom: 20px; }
+    }
+    .task-checkbox {
+        position: absolute;
+        right: -170px;
+        border: 2px solid red;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Start Page -->
+    <div id="start-page">
+      <h1>Start Challenge & Habits</h1>
+      <input type="text" id="challenge-name-input" placeholder="Challenge Name" />
+      <input type="number" id="duration-input" placeholder="Total Days (e.g. 10)" min="1" />
+      <textarea id="tasks-input" rows="5" placeholder="Enter daily challenge tasks, one per line"></textarea>
+      <textarea id="habits-input" rows="5" placeholder="Enter daily habits in format: HabitName:count (one per line, e.g. Drink Water:4)"></textarea>
+      <button id="start-btn">Start</button>
+    </div>
+
+    <!-- Daily Page -->
+    <div id="daily-page" class="hidden">
+      <div class="nav">
+        <button id="view-history-btn">View History</button>
+      </div>
+      <h2 id="daily-title"></h2>
+      <div class="circle-container">
+        <!-- Left: Today's Challenge Progress -->
+        <div class="circle">
+          <svg><circle class="bg" cx="55" cy="55" r="50"></circle><circle class="progress" id="challenge-daily-progress" cx="55" cy="55" r="50"></circle></svg>
+          <div class="label" id="challenge-daily-label">0%</div>
+        </div>
+        <!-- Right: Habit Progress -->
+        <div class="circle">
+          <svg><circle class="bg" cx="55" cy="55" r="50"></circle><circle class="progress" id="habit-progress" cx="55" cy="55" r="50"></circle></svg>
+          <div class="label" id="habit-progress-label">0%</div>
+        </div>
+      </div>
+      <!-- Mode Toggle -->
+      <div class="mode-container">
+        <span id="mode-challenge" class="mode active">Challenge</span>
+        <span id="mode-habits" class="mode">Habits</span>
+      </div>
+      <!-- Challenge Day Progress Bar -->
+      <div class="progress-bar-container" id="challenge-bar-container">
+        <div class="progress-label">Challenge Progress</div>
+        <div class="progress-bar">
+          <div class="progress-bar-inner" id="challenge-bar-inner"></div>
+        </div>
+      </div>
+      <!-- Task/Habit List -->
+      <ul id="tasks-list"></ul>
+    </div>
+
+    <!-- History Page -->
+    <div id="history-page" class="hidden">
+      <div class="nav">
+        <button id="back-to-daily-btn">Back</button>
+      </div>
+      <h2 id="history-title"></h2>
+      <!-- Challenge History -->
+      <div class="history-section">
+        <div class="history-label">Challenge History</div>
+        <div id="challenge-history-container"></div>
+      </div>
+      <!-- Habits History -->
+      <div class="history-section">
+        <div class="history-label">Habits History</div>
+        <div id="habit-history-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Utility: Circular progress setter
+      function setCircleProgress(circleEl, percentage) {
+        const radius = circleEl.r.baseVal.value;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percentage / 100) * circumference;
+        circleEl.style.strokeDasharray = `${circumference} ${circumference}`;
+        circleEl.style.strokeDashoffset = offset;
+      }
+
+      // DOM Elements
+      const startPage = document.getElementById('start-page');
+      const dailyPage = document.getElementById('daily-page');
+      const historyPage = document.getElementById('history-page');
+      const challengeNameInput = document.getElementById('challenge-name-input');
+      const durationInput = document.getElementById('duration-input');
+      const tasksInput = document.getElementById('tasks-input');
+      const habitsInput = document.getElementById('habits-input');
+      const startBtn = document.getElementById('start-btn');
+      const dailyTitle = document.getElementById('daily-title');
+      const tasksList = document.getElementById('tasks-list');
+      const challengeDailyCircle = document.getElementById('challenge-daily-progress');
+      const challengeDailyLabel = document.getElementById('challenge-daily-label');
+      const habitCircle = document.getElementById('habit-progress');
+      const habitLabel = document.getElementById('habit-progress-label');
+      const modeChallenge = document.getElementById('mode-challenge');
+      const modeHabits = document.getElementById('mode-habits');
+      const challengeBarInner = document.getElementById('challenge-bar-inner');
+      const challengeBarContainer = document.getElementById('challenge-bar-container');
+      const viewHistoryBtn = document.getElementById('view-history-btn');
+      const backToDailyBtn = document.getElementById('back-to-daily-btn');
+      const historyTitle = document.getElementById('history-title');
+      const challengeHistoryContainer = document.getElementById('challenge-history-container');
+      const habitHistoryContainer = document.getElementById('habit-history-container');
+
+      // State
+      let challengeData = null; // { name, totalDays, tasks: [], habits: [{name, count}], startDate }
+      let dailyStatus = {};     // { "YYYY-MM-DD": [bool, bool, ...] }
+      let habitStatus = {};     // { "YYYY-MM-DD": [numTicks, numTicks, ...] }
+      let currentMode = 'challenge'; // or 'habits'
+      let todayDate = new Date().toISOString().split('T')[0];
+
+      // LocalStorage Keys
+      const CHALLENGE_KEY = 'fixed_challenge_data';
+      const STATUS_KEY = 'fixed_challenge_status';
+      const HABIT_STATUS_KEY = 'habit_status_data';
+
+      // Initialize App
+      function init() {
+        const savedChallenge = localStorage.getItem(CHALLENGE_KEY);
+        const savedStatus = localStorage.getItem(STATUS_KEY);
+        const savedHabitStatus = localStorage.getItem(HABIT_STATUS_KEY);
+        if (savedChallenge) {
+          challengeData = JSON.parse(savedChallenge);
+          dailyStatus = savedStatus ? JSON.parse(savedStatus) : {};
+          habitStatus = savedHabitStatus ? JSON.parse(savedHabitStatus) : {};
+          const daysPassed = getDaysPassed();
+          if (daysPassed < challengeData.totalDays) {
+            showDailyPage();
+            return;
+          } else {
+            localStorage.removeItem(CHALLENGE_KEY);
+            localStorage.removeItem(STATUS_KEY);
+            localStorage.removeItem(HABIT_STATUS_KEY);
+          }
+        }
+        showStartPage();
+      }
+
+      // Show/Hide Pages
+      function showStartPage() {
+        startPage.classList.remove('hidden');
+        dailyPage.classList.add('hidden');
+        historyPage.classList.add('hidden');
+      }
+      function showDailyPage() {
+        startPage.classList.add('hidden');
+        dailyPage.classList.remove('hidden');
+        historyPage.classList.add('hidden');
+        renderDaily();
+      }
+      function showHistoryPage() {
+        startPage.classList.add('hidden');
+        dailyPage.classList.add('hidden');
+        historyPage.classList.remove('hidden');
+        renderHistory();
+      }
+
+      // Parse habits input into array of {name, count}
+      function parseHabits(text) {
+        return text
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line)
+          .map(line => {
+            const [name, cnt] = line.split(':').map(s => s.trim());
+            return { name, count: Number(cnt) || 1 };
+          });
+      }
+
+      // Start Button Click
+      startBtn.addEventListener('click', () => {
+        const name = challengeNameInput.value.trim();
+        const totalDays = Number(durationInput.value);
+        const tasksArr = tasksInput.value.split('\n').map(t => t.trim()).filter(t => t);
+        const habitsArr = parseHabits(habitsInput.value);
+        if (!name) { alert('Enter a challenge name.'); return; }
+        if (!totalDays || isNaN(totalDays) || totalDays < 1) { alert('Enter valid number of days.'); return; }
+        if (tasksArr.length === 0) { alert('Enter at least one challenge task.'); return; }
+        challengeData = { name, totalDays, tasks: tasksArr, habits: habitsArr, startDate: todayDate };
+        dailyStatus = {};
+        habitStatus = {};
+        saveData();
+        showDailyPage();
+      });
+
+      // Save to LocalStorage
+      function saveData() {
+        localStorage.setItem(CHALLENGE_KEY, JSON.stringify(challengeData));
+        localStorage.setItem(STATUS_KEY, JSON.stringify(dailyStatus));
+        localStorage.setItem(HABIT_STATUS_KEY, JSON.stringify(habitStatus));
+      }
+
+      // Days passed since start (0-based)
+      function getDaysPassed() {
+        const start = new Date(challengeData.startDate + 'T00:00:00');
+        const today = new Date(todayDate + 'T00:00:00');
+        const diff = today - start;
+        return Math.floor(diff / (1000 * 60 * 60 * 24));
+      }
+
+      // Ensure today's status exists
+      function initTodayStatuses() {
+        if (!dailyStatus[todayDate]) {
+          dailyStatus[todayDate] = new Array(challengeData.tasks.length).fill(false);
+        }
+        if (!habitStatus[todayDate]) {
+          habitStatus[todayDate] = challengeData.habits.map(() => 0);
+        }
+        saveData();
+      }
+
+      // Render Daily Page
+      function renderDaily() {
+        dailyTitle.textContent = `${challengeData.name} - Day ${getDaysPassed() + 1} of ${challengeData.totalDays}`;
+        initTodayStatuses();
+        updateChallengeDailyProgress();
+        updateChallengeBar();
+        updateHabitProgress();
+        renderTasksList();
+        scheduleMidnightReset();
+      }
+
+      // Render Tasks or Habits List based on mode
+      function renderTasksList() {
+        tasksList.innerHTML = '';
+        if (currentMode === 'challenge') {
+          const statuses = dailyStatus[todayDate];
+          challengeData.tasks.forEach((task, idx) => {
+            const li = document.createElement('li');
+            const span = document.createElement('span');
+            span.textContent = task;
+            const checkbox = document.createElement('input');
+            checkbox.classList.add('task-checkbox');
+            checkbox.type = 'checkbox';
+            checkbox.checked = statuses[idx];
+            checkbox.addEventListener('change', () => {
+              dailyStatus[todayDate][idx] = checkbox.checked;
+              saveData();
+              updateChallengeDailyProgress();
+            });
+            li.appendChild(span);
+            li.appendChild(checkbox);
+            tasksList.appendChild(li);
+          });
+        } else {
+          const ticks = habitStatus[todayDate];
+          challengeData.habits.forEach((habit, idx) => {
+            const li = document.createElement('li');
+            const span = document.createElement('span');
+            span.textContent = habit.name + ` (${ticks[idx]}/${habit.count})`;
+            const tickContainer = document.createElement('div');
+            tickContainer.classList.add('habit-ticks');
+            for (let i = 1; i <= habit.count; i++) {
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.checked = i <= ticks[idx];
+              cb.addEventListener('change', () => {
+                const checkedCount = Array.from(tickContainer.querySelectorAll('input[type=checkbox]')).filter(c => c.checked).length;
+                habitStatus[todayDate][idx] = checkedCount;
+                saveData();
+                span.textContent = habit.name + ` (${checkedCount}/${habit.count})`;
+                updateHabitProgress();
+              });
+              tickContainer.appendChild(cb);
+            }
+            li.appendChild(span);
+            li.appendChild(tickContainer);
+            tasksList.appendChild(li);
+          });
+        }
+      }
+
+      // Update Challenge Daily Circle (left)
+      function updateChallengeDailyProgress() {
+        const statuses = dailyStatus[todayDate] || [];
+        const done = statuses.filter(v => v).length;
+        const total = challengeData.tasks.length;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        setCircleProgress(challengeDailyCircle, pct);
+        challengeDailyLabel.textContent = `${pct}%`;
+      }
+
+      // Update Challenge Overall Bar
+      function updateChallengeBar() {
+        const daysPassed = getDaysPassed() + 1;
+        const pct = Math.round((daysPassed / challengeData.totalDays) * 100);
+        challengeBarInner.style.width = pct + '%';
+      }
+
+      // Update Habit Progress Circle (right)
+      function updateHabitProgress() {
+        const ticks = habitStatus[todayDate] || [];
+        const doneTicks = ticks.reduce((sum, t) => sum + t, 0);
+        const totalTicks = challengeData.habits.reduce((sum, h) => sum + h.count, 0);
+        const pct = totalTicks ? Math.round((doneTicks / totalTicks) * 100) : 0;
+        setCircleProgress(habitCircle, pct);
+        habitLabel.textContent = `${pct}%`;
+      }
+
+      // Mode Toggle Clicks
+      modeChallenge.addEventListener('click', () => {
+        currentMode = 'challenge';
+        modeChallenge.classList.add('active');
+        modeHabits.classList.remove('active');
+        challengeBarContainer.style.display = 'block';
+        renderTasksList();
+      });
+      modeHabits.addEventListener('click', () => {
+        currentMode = 'habits';
+        modeHabits.classList.add('active');
+        modeChallenge.classList.remove('active');
+        challengeBarContainer.style.display = 'none';
+        renderTasksList();
+      });
+
+      // Schedule reset at midnight
+      function scheduleMidnightReset() {
+        const now = new Date();
+        const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const msUntilMidnight = nextMidnight - now;
+        setTimeout(() => {
+          todayDate = new Date().toISOString().split('T')[0];
+          const daysPassed = getDaysPassed();
+          if (daysPassed < challengeData.totalDays) {
+            initTodayStatuses();
+            renderDaily();
+          } else {
+            alert('Congratulations! Challenge completed.');
+            localStorage.removeItem(CHALLENGE_KEY);
+            localStorage.removeItem(STATUS_KEY);
+            localStorage.removeItem(HABIT_STATUS_KEY);
+            location.reload();
+          }
+        }, msUntilMidnight + 1000);
+      }
+
+      // Render History Page with Collapsible Habit Details
+      function renderHistory() {
+        historyTitle.textContent = `${challengeData.name} - History`;
+        // Challenge History
+        const tableC = document.createElement('table');
+        const theadC = document.createElement('thead');
+        const trC = document.createElement('tr');
+        const dateTh = document.createElement('th'); dateTh.textContent = 'Date'; trC.appendChild(dateTh);
+        challengeData.tasks.forEach(task => { const th = document.createElement('th'); th.textContent = task; trC.appendChild(th); });
+        theadC.appendChild(trC); tableC.appendChild(theadC);
+        const tbodyC = document.createElement('tbody');
+        Object.keys(dailyStatus).sort().forEach(date => {
+          const row = document.createElement('tr');
+          const dateTd = document.createElement('td'); dateTd.textContent = date; row.appendChild(dateTd);
+          dailyStatus[date].forEach(flag => {
+            const td = document.createElement('td'); td.innerHTML = flag ? '&#10003;' : '&#8211;'; td.classList.add(flag ? 'completed' : 'missed'); row.appendChild(td);
+          });
+          tbodyC.appendChild(row);
+        });
+        tableC.appendChild(tbodyC);
+        challengeHistoryContainer.innerHTML = ''; challengeHistoryContainer.appendChild(tableC);
+
+        // Habit History (Collapsible)
+        const tableH = document.createElement('table');
+        const theadH = document.createElement('thead');
+        const trH = document.createElement('tr');
+        const colDateTh = document.createElement('th'); colDateTh.textContent = 'Date'; trH.appendChild(colDateTh);
+        const colOverallTh = document.createElement('th'); colOverallTh.textContent = 'Habit %'; trH.appendChild(colOverallTh);
+        theadH.appendChild(trH); tableH.appendChild(theadH);
+        const tbodyH = document.createElement('tbody');
+        Object.keys(habitStatus).sort().forEach(date => {
+          const ticksArr = habitStatus[date];
+          const totalDone = ticksArr.reduce((sum, t) => sum + t, 0);
+          const totalPossible = challengeData.habits.reduce((sum, h) => sum + h.count, 0);
+          const overallPct = totalPossible ? Math.round((totalDone / totalPossible) * 100) : 0;
+
+          // Main row
+          const trMain = document.createElement('tr');
+          const tdDate = document.createElement('td');
+          tdDate.classList.add('date-cell');
+          tdDate.innerHTML = `${date} <span class="toggle-icon">▶</span>`;
+          trMain.appendChild(tdDate);
+          const tdPct = document.createElement('td'); tdPct.textContent = overallPct + '%'; trMain.appendChild(tdPct);
+          tbodyH.appendChild(trMain);
+
+          // Detail row (hidden by default)
+          const trDetail = document.createElement('tr');
+          trDetail.classList.add('detail-row');
+          trDetail.style.display = 'none';
+          const tdDetail = document.createElement('td');
+          tdDetail.setAttribute('colspan', '2');
+          const detailList = document.createElement('ul');
+          challengeData.habits.forEach((habit, idx) => {
+            const done = ticksArr[idx] || 0;
+            const pct = habit.count ? Math.round((done / habit.count) * 100) : 0;
+            const li = document.createElement('li');
+            li.textContent = `${habit.name}: ${done}/${habit.count} (${pct}%)`;
+            detailList.appendChild(li);
+          });
+          tdDetail.appendChild(detailList);
+          trDetail.appendChild(tdDetail);
+          tbodyH.appendChild(trDetail);
+
+          // Toggle behavior: click on date-cell toggles detail
+          tdDate.addEventListener('click', () => {
+            const isHidden = trDetail.style.display === 'none';
+            trDetail.style.display = isHidden ? '' : 'none';
+            const icon = tdDate.querySelector('.toggle-icon');
+            icon.textContent = isHidden ? '▼' : '▶';
+          });
+        });
+        tableH.appendChild(tbodyH);
+        habitHistoryContainer.innerHTML = ''; habitHistoryContainer.appendChild(tableH);
+      }
+
+      // Navigation
+      viewHistoryBtn.addEventListener('click', showHistoryPage);
+      backToDailyBtn.addEventListener('click', showDailyPage);
+
+      // Initialize on load
+      init();
+    });
+  </script>
+</body>
+</html>
